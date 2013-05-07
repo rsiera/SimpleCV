@@ -1,7 +1,7 @@
 --------------------------
 # SimpleCV
 --------------------------
-
+Run GSOC demo python SimpleCV/examples/machine-learning/handwritten_recognition.py
 [![Build Status](https://travis-ci.org/sightmachine/SimpleCV.png?branch=develop)](https://travis-ci.org/sightmachine/SimpleCV)
 
 
