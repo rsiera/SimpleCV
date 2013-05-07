@@ -253,7 +253,7 @@ class ColorModel:
         >>> cm.load("myColors.txt")
         >>> cm.add(Color.RED)
         >>> cm.add(Color.BLUE)
-        >>> cm.save("mymodel)
+        >>> cm.save("mymodel")
 
         """
         self.mData =  load(open(filename))

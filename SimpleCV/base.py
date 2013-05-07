@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
 # SimpleCV system includes
+import mimetypes
 import os
 import sys
+import tarfile
 import warnings
 import time
 import socket
@@ -57,7 +59,8 @@ except ImportError:
     try:
         import cv
     except ImportError:
-        raise ImportError("Cannot load OpenCV library which is required by SimpleCV")
+        raise ImportError(
+            "Cannot load OpenCV library which is required by SimpleCV")
 
 
 #optional libraries
@@ -67,8 +70,9 @@ try:
     from PIL import ImageFont as pilImageFont
     from PIL import ImageDraw as pilImageDraw
     from PIL import GifImagePlugin
+
     getheader = GifImagePlugin.getheader
-    getdata   = GifImagePlugin.getdata
+    getdata = GifImagePlugin.getdata
 except ImportError:
     try:
         import Image as pil
@@ -94,7 +98,6 @@ try:
 except ImportError:
     OCR_ENABLED = False
 
-
 PYSCREENSHOT_ENABLED = True
 try:
     import pyscreenshot
@@ -110,6 +113,7 @@ try:
 
 except ImportError:
     ORANGE_ENABLED = False
+
 
 class InitOptionsHandler(object):
     """
@@ -133,12 +137,41 @@ class InitOptionsHandler(object):
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         self.headless = True
 
+
+
 init_options_handler = InitOptionsHandler()
+
+
+class ExtractCompressedFile(object):
+    def __init__(self, tmpdir, path):
+        self.tmpdir = tmpdir
+        self.path = path
+
+        self.file_type = mimetypes.guess_type(path)
+
+        if self.file_type[0] == 'application/zip':
+            self.opener, self.mode = zipfile.ZipFile, 'r'
+        elif self.file_type == ('application/x-tar', 'gzip'):
+            self.opener, self.mode = tarfile.open, 'r:gz'
+        elif self.file_type == ('application/x-tar', 'bzip2'):
+            self.opener, self.mode = tarfile.open, 'r:bz2'
+        else:
+            raise ValueError, "Could not extract `%s` as no appropriate extractor is found" % path
+
+    def extract(self):
+        try:
+            cfile = self.opener(self.path, self.mode)
+            cfile.extractall(os.path.dirname(self.path))
+        except:
+            logger.warning("Couldn't extract %s file" % self.file_type[0])
+        return None
+
 
 try:
     import pygame as pg
 except ImportError:
     init_options_handler.set_headless()
+
 
 #couple quick typecheck helper functions
 def is_number(n):
@@ -149,13 +182,15 @@ def is_number(n):
     """
     return type(n) in (IntType, LongType, FloatType)
 
+
 def is_tuple(n):
     """
     Determines if it is a tuple or not
 
     Returns: Boolean
     """
-    return type(n) == tuple
+    return isinstance(n, tuple)
+
 
 def reverse_tuple(n):
     """
@@ -165,6 +200,7 @@ def reverse_tuple(n):
     """
     return tuple(reversed(n))
 
+
 def find(f, seq):
     """
     Search for item in a list
@@ -172,9 +208,10 @@ def find(f, seq):
     Returns: Boolean
     """
     for item in seq:
-        if (f == item):
+        if f == item:
             return True
     return False
+
 
 def test():
     """
@@ -186,37 +223,33 @@ def test():
 
 def download_and_extract(URL):
     """
-    This function takes in a URL for a zip file, extracts it and returns
+    This function takes in a URL for a zip, tar file, extracts it and returns
     the temporary path it was extracted to
     """
-    if URL == None:
+    if URL is None:
         logger.warning("Please provide URL")
         return None
 
     tmpdir = tempfile.mkdtemp()
     filename = os.path.basename(URL)
-    path = tmpdir + "/" + filename
+    path = os.path.join(tmpdir, filename)
     zdata = urllib2.urlopen(URL)
 
     print "Saving file to disk please wait...."
     with open(path, "wb") as local_file:
         local_file.write(zdata.read())
 
-    zfile = zipfile.ZipFile(path)
-    print "Extracting zipfile"
-    try:
-        zfile.extractall(tmpdir)
-    except:
-        logger.warning("Couldn't extract zip file")
-        return None
-
+    cfile = ExtractCompressedFile(tmpdir=tmpdir, path=path)
+    cfile.extract()
     return tmpdir
+
 
 def int_to_bin(i):
     """Integer to two bytes"""
     i1 = i % 256
-    i2 = int(i/256)
+    i2 = int(i / 256)
     return chr(i1) + chr(i2)
+
 
 def npArray2cvMat(inputMat, dataType=cv.CV_32FC1):
     """
@@ -224,28 +257,32 @@ def npArray2cvMat(inputMat, dataType=cv.CV_32FC1):
 
     Returns: cvMatrix
     """
-    if( type(inputMat) == np.ndarray ):
+    if isinstance(inputMat, np.ndarray):
         sz = len(inputMat.shape)
-        temp_mat = None
-        if( dataType == cv.CV_32FC1 or dataType == cv.CV_32FC2 or dataType == cv.CV_32FC3 or dataType == cv.CV_32FC4 ):
+        if dataType == cv.CV_32FC1 or dataType == cv.CV_32FC2 or dataType == cv.CV_32FC3 or dataType == cv.CV_32FC4:
             temp_mat = np.array(inputMat, dtype='float32')
-        elif( dataType == cv.CV_8UC1 or  dataType == cv.CV_8UC2 or dataType == cv.CV_8UC3 or dataType == cv.CV_8UC3):
-            temp_mat = np.array(inputMat,dtype='uint8')
+        elif dataType == cv.CV_8UC1 or dataType == cv.CV_8UC2 or dataType == cv.CV_8UC3 or dataType == cv.CV_8UC3:
+            temp_mat = np.array(inputMat, dtype='uint8')
         else:
             logger.warning("MatrixConversionUtil: the input matrix type is not supported")
             return None
-        if( sz == 1 ): #this needs to be changed so we can do row/col vectors
+        if sz == 1: #this needs to be changed so we can do row/col vectors
             retVal = cv.CreateMat(inputMat.shape[0], 1, dataType)
-            cv.SetData(retVal, temp_mat.tostring(), temp_mat.dtype.itemsize * temp_mat.shape[0])
-        elif( sz == 2 ):
-            retVal = cv.CreateMat(temp_mat.shape[0], temp_mat.shape[1], dataType)
-            cv.SetData(retVal, temp_mat.tostring(), temp_mat.dtype.itemsize * temp_mat.shape[1])
-        elif( sz > 2 ):
-            logger.warning("MatrixConversionUtil: the input matrix type is not supported")
+            cv.SetData(retVal, temp_mat.tostring(),
+                       temp_mat.dtype.itemsize * temp_mat.shape[0])
+        elif sz == 2:
+            retVal = cv.CreateMat(temp_mat.shape[0], temp_mat.shape[1],
+                                  dataType)
+            cv.SetData(retVal, temp_mat.tostring(),
+                       temp_mat.dtype.itemsize * temp_mat.shape[1])
+        elif sz > 2:
+            logger.warning(
+                "MatrixConversionUtil: the input matrix type is not supported")
             return None
         return retVal
     else:
-        logger.warning("MatrixConversionUtil: the input matrix type is not supported")
+        logger.warning(
+            "MatrixConversionUtil: the input matrix type is not supported")
 
 #Logging system - Global elements
 
@@ -261,6 +298,7 @@ try:
 except ImportError:
     ipython_version = None
 
+
 #This is used with sys.excepthook to log all uncaught exceptions.
 #By default, error messages ARE print to stderr.
 def exception_handler(excType, excValue, traceback):
@@ -270,15 +308,18 @@ def exception_handler(excType, excValue, traceback):
     #excValue has the most important info about the error.
     #It'd be possible to display only that and hide all the (unfriendly) rest.
 
+
 sys.excepthook = exception_handler
 
-def ipython_exception_handler(shell, excType, excValue, traceback,tb_offset=0):
+
+def ipython_exception_handler(shell, excType, excValue, traceback, tb_offset=0):
     logger.error("", exc_info=(excType, excValue, traceback))
 
 
 #The two following functions are used internally.
 def init_logging(log_level):
     logger.setLevel(log_level)
+
 
 def read_logging_level(log_level):
     levels_dict = {
@@ -289,7 +330,7 @@ def read_logging_level(log_level):
         5: logging.CRITICAL, "critical": logging.CRITICAL
     }
 
-    if isinstance(log_level,str):
+    if isinstance(log_level, str):
         log_level = log_level.lower()
 
     if log_level in levels_dict:
@@ -297,6 +338,7 @@ def read_logging_level(log_level):
     else:
         print "The logging level given is not valid"
         return None
+
 
 def get_logging_level():
     """
@@ -310,9 +352,11 @@ def get_logging_level():
         50: "CRITICAL"
     }
 
-    print "The current logging level is:", levels_dict[logger.getEffectiveLevel()]
+    print "The current logging level is:", levels_dict[
+        logger.getEffectiveLevel()]
 
-def set_logging(log_level,myfilename = None):
+
+def set_logging(log_level, myfilename=None):
     """
     This function sets the threshold for the logging system and, if desired,
     directs the messages to a logfile. Level options:
@@ -331,13 +375,13 @@ def set_logging(log_level,myfilename = None):
     if myfilename and ipython_version:
         try:
             if ipython_version.startswith("0.10"):
-                __IPYTHON__.set_custom_exc((Exception,), ipython_exception_handler)
+                __IPYTHON__.set_custom_exc((Exception,),
+                                           ipython_exception_handler)
             else:
                 ip = get_ipython()
                 ip.set_custom_exc((Exception,), ipython_exception_handler)
         except NameError: #In case the interactive shell is not being used
             sys.exc_clear()
-
 
     level = read_logging_level(log_level)
 
@@ -347,11 +391,12 @@ def set_logging(log_level,myfilename = None):
         fileHandler.setFormatter(formatter)
         logger.addHandler(fileHandler)
         logger.removeHandler(consoleHandler) #Console logging is disabled.
-        print "Now logging to",myfilename,"with level",log_level
+        print "Now logging to", myfilename, "with level", log_level
     elif level:
-        print "Now logging with level",log_level
+        print "Now logging with level", log_level
 
     logger.setLevel(level)
+
 
 def system():
     """
@@ -375,43 +420,47 @@ def system():
       
       
     """
-    try :
+    try:
         import platform
+
         print "System : ", platform.system()
         print "OS version : ", platform.version()
         print "Python version :", platform.python_version()
-        try :
+        try:
             from cv2 import __version__
+
             print "Open CV version : " + __version__
-        except ImportError :
+        except ImportError:
             print "Open CV2 version : " + "2.1"
-        if (PIL_ENABLED) :
+        if PIL_ENABLED:
             print "PIL version : ", pil.VERSION
-        else :
+        else:
             print "PIL module not installed"
-        if (ORANGE_ENABLED) :
+        if ORANGE_ENABLED:
             print "Orange Version : " + orange.version
-        else :
+        else:
             print "Orange module not installed"
-        try :
+        try:
             import pygame as pg
+
             print "PyGame Version : " + pg.__version__
         except ImportError:
             print "PyGame module not installed"
-        try :
+        try:
             import pickle
+
             print "Pickle Version : " + pickle.__version__
-        except :
+        except ImportError:
             print "Pickle module not installed"
 
-    except ImportError :
+    except ImportError:
         print "You need to install Platform to use this function"
         print "to install you can use:"
         print "easy_install platform"
     return
 
-class LazyProperty(object):
 
+class LazyProperty(object):
     def __init__(self, func):
         self._func = func
         self.__name__ = func.__name__
@@ -423,7 +472,9 @@ class LazyProperty(object):
         return result
 
 #supported image formats regular expression
-IMAGE_FORMATS = ('*.bmp','*.gif','*.jpg','*.jpe','*.jpeg','*.png','*.pbm','*.pgm','*.ppm','*.tif','*.tiff','*.webp')
+IMAGE_FORMATS = (
+    '*.bmp', '*.gif', '*.jpg', '*.jpe', '*.jpeg', '*.png', '*.pbm', '*.pgm',
+    '*.ppm', '*.tif', '*.tiff', '*.webp')
 #maximum image size -
-MAX_DIMENSION = 2*6000 # about twice the size of a full 35mm images - if you hit this, you got a lot data.
+MAX_DIMENSION = 2 * 6000 # about twice the size of a full 35mm images - if you hit this, you got a lot data.
 LAUNCH_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__)))
