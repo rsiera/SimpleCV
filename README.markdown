@@ -1,9 +1,9 @@
 --------------------------
 # SimpleCV
 --------------------------
-Run GSOC demo 
-pip install pybrain==0.3
-python SimpleCV/examples/machine-learning/handwritten_recognition.py
+Run GSOC demo<br/>
+pip install pybrain==0.3<br/>
+python SimpleCV/examples/machine-learning/handwritten_recognition.py<br/>
 
 [![Build Status](https://travis-ci.org/sightmachine/SimpleCV.png?branch=develop)](https://travis-ci.org/sightmachine/SimpleCV)
 
