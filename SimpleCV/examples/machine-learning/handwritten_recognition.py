@@ -1,9 +1,7 @@
-import array
+import numpy
 import os
 from pybrain import SoftmaxLayer
 from pybrain.datasets import ClassificationDataSet
-
-#Download the dataset
 from pybrain.supervised import BackpropTrainer
 from pybrain.tools.shortcuts import buildNetwork
 from pybrain.utilities import percentError
@@ -17,25 +15,29 @@ print 'Test Images Downloaded at:', data_path
 def create_dataset_handwritten(test=None):
     dataset = ClassificationDataSet(784, 1, nb_classes=10)
     if test:
-        out = 0
-        img = Image(os.path.join(LAUNCH_PATH, 'MachineLearning', 'data',
-                    'handwritten_samples', '0.png'))
-        contour_array = img.getGrayNumpy().T.flatten()
-        dataset.addSample(contour_array, [out])
-        dataset.assignClasses()
+        samples_path = os.path.join(LAUNCH_PATH, 'sampleimages',
+                                    'handwritten_samples')
+        for fid in os.listdir(samples_path):
+            out = fid.split('_')[0]
+            img = Image(os.path.join(samples_path, fid))
+            contour_array = img.getGrayNumpy().T.flatten()
+            dataset.addSample(contour_array, [out])
+            dataset.assignClasses()
 
     else:
         dataset_path = os.path.join(data_path, 'handwritten_dataset')
         for obj in os.listdir(dataset_path):
             example_digit = os.path.join(dataset_path, obj)
             digit = int(example_digit[-1].strip())
-            with open(example_digit) as f:
+            with open(example_digit, 'rb') as fid:
                 for x in xrange(500):
-                    contour_array = array.array("B")
-                    contour_array.fromfile(f, 28 * 28)
-                    dataset.addSample(contour_array.tolist(), [digit])
+                    data_array = numpy.fromfile(fid, dtype=numpy.uint8,
+                                                count=28 * 28)
+                    dataset.addSample(data_array.tolist(), [digit])
             dataset.assignClasses()
+
     return dataset
+
 
 training_dataset = create_dataset_handwritten()
 training_dataset._convertToOneOfMany()
@@ -43,13 +45,13 @@ training_dataset._convertToOneOfMany()
 testing_dataset = create_dataset_handwritten(test=True)
 testing_dataset._convertToOneOfMany()
 
-hidden_neuron = 200
+hidden_neuron = 250
 fnn = buildNetwork(training_dataset.indim, hidden_neuron,
                    training_dataset.outdim,
                    outclass=SoftmaxLayer)
 
 # fnn = NetworkReader.readFrom(network_path)
-trainer = BackpropTrainer(fnn, dataset=training_dataset, learningrate=0.01,
+trainer = BackpropTrainer(fnn, dataset=training_dataset, learningrate=0.05,
                           momentum=0.5, verbose=True)
 
 for i in range(100):
